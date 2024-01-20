@@ -3,43 +3,44 @@
 # files directly in the output element instead of requiring them to be included
 # in the ui head everytime
 
-
-from shiny import ui, App
 from pathlib import Path
+
 import pandas as pd
 from htmltools import HTMLDependency
 
-
-from shiny.render.transformer import (
-    output_transformer,
-    resolve_value_fn,
-    TransformerMetadata,
-    ValueFn,
-)
+from shiny import App, Inputs, ui
 from shiny.module import resolve_id
+from shiny.render.renderer import Jsonifiable, Renderer
 
 
-@output_transformer()
-async def render_tabulator(
-    _meta: TransformerMetadata,
-    _fn: ValueFn[pd.DataFrame | None],
-):
-    res = await resolve_value_fn(_fn)
-    if res is None:
-        return None
+class render_tabulator(Renderer[pd.DataFrame]):
+    """
+    Render a pandas dataframe as a tabulator table.
+    """
 
-    if not isinstance(res, pd.DataFrame):
-        # Throw an error if the value is not a dataframe
-        raise TypeError(f"Expected a pandas.DataFrame, got {type(res)}. ")
+    def auto_output_ui(self):
+        """
+        Express UI for the tabulator renderer
+        """
+        return ui.output_tabulator(self.output_name)
 
-    # Get data from dataframe as a list of lists where each inner list is a
-    # row, column names as array of strings and types of each column as an
-    # array of strings
-    return {
-        "data": res.values.tolist(),
-        "columns": res.columns.tolist(),
-        "type_hints": res.dtypes.astype(str).tolist(),
-    }
+    async def transform(self, value: pd.DataFrame) -> Jsonifiable:
+        """
+        Transform a pandas dataframe into a JSONifiable object that can be
+        passed to the tabulator HTML dependency.
+        """
+        if not isinstance(value, pd.DataFrame):
+            # Throw an error if the value is not a dataframe
+            raise TypeError(f"Expected a pandas.DataFrame, got {type(value)}. ")
+
+        # Get data from dataframe as a list of lists where each inner list is a
+        # row, column names as array of strings and types of each column as an
+        # array of strings
+        return {
+            "data": value.values.tolist(),
+            "columns": value.columns.tolist(),
+            "type_hints": value.dtypes.astype(str).tolist(),
+        }
 
 
 tabulator_dep = HTMLDependency(
@@ -72,10 +73,11 @@ app_ui = ui.page_fluid(
 )
 
 
-def server(input, output, session):
+def server(input: Inputs):
     @render_tabulator
     def tabulatorTable():
-        return pd.read_csv(Path(__file__).parent / "mtcars.csv").head(input.n())
+        csv_path = Path(__file__).parent / "mtcars.csv"
+        return pd.read_csv(csv_path).head(input.n())
 
 
 app = App(app_ui, server)
