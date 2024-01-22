@@ -213,15 +213,15 @@ class render_tabulator(Renderer[pd.DataFrame]):
         }
 ```
 
-The `Renderer[IT]` class is a decorator that renders output value functions into Jsonifiable objects. A renderer subclass is composed of three main parts: `IT`, `auto_output_ui` and either a `transform` or `render` function.
+An implementation of `Renderer` produces a class which is intended to be used as a decorator, which is why a `render_*` naming convention is recommended. An implementation requires at least 3 things: (1) `auto_output_ui`, (2) either a `transform` or `render` function, and (3) an value type for the `Renderer` class.
 
-`IT` represents the type of the value returned by an output value function. It helps users with IDE support know what kind of objects may be returned by their output value function.
+Here, the value type we've used is `pd.DataFrame`, which helps users know if they've returned a suitable object in their render function.
 
 The `auto_output_ui()` method is used to generate the UI for the output if the renderer were to be used in Express mode. In this case we just use the `output_tabulator()` function we wrote earlier.
 
 Finally, renderers use either the `transform(self, value: IT)` or `render(self)` methods to retrieve and transform the result of an output value function into an object that can be sent to the client. `render_tabulator`'s `transform` method returns a dictionary of data (which is JSON-like, e.g. `Jsonifiable`) to be passed to the client side. The `transform` method is called when the output value function returns a non-`None` value. If the value is `None`, the `render` method quits early, returning `None`.
 
-In the code above we use types so that we can get some type checking in our IDE, but these are not required. Also note that the `transform` function is an async function even if we do not specifically call `await` within the function.
+In the code above we use types so that we can get some type checking in our IDE, but these are not required. It is required by Shiny `Renderer` that the `transform` be `async`. This allows for asynchronous transformations to occur even if the output value function is synchronous. By providing an async function, `Renderer` can then handle either an async or sync function provided by the user.
 
 When first transforming an output value, we check to make sure that the value returned by the function is a dataframe. If it's not, we throw an error. This is not required, but it's good practice to do so.
 
